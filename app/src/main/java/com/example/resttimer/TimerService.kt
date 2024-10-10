@@ -1,13 +1,18 @@
 package com.example.resttimer
 
 import android.app.*
+import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.media.AudioManager
 import android.os.*
 import androidx.core.app.NotificationCompat
 import android.widget.RemoteViews
 import kotlinx.coroutines.*
 import android.media.RingtoneManager
 import android.media.Ringtone
+import android.graphics.Color
+
 
 class TimerService : Service() {
 
@@ -19,8 +24,6 @@ class TimerService : Service() {
 
         const val NOTIF_CHANNEL_ID = "TimerChannel"
         const val NOTIF_ID = 1
-        const val JINGLE_CHANNEL_ID = "JingleChannel"
-        const val JINGLE_ID = 2
     }
 
     private var remoteViews: RemoteViews? = null
@@ -29,18 +32,19 @@ class TimerService : Service() {
     private var timerJob: Job? = null
     private var runtime = DEFAULT_RUN_TIME
     private var secondsRemaining = DEFAULT_RUN_TIME
+    private lateinit var ringtone: Ringtone
 
     override fun onCreate() {
         super.onCreate()
         notificationManager = getSystemService(NotificationManager::class.java)
         createNotificationChannel()
-        createJingleChannel()
+        initializeRingtone()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_START_TIMER -> {
-                runtime = intent.getIntExtra("runtime", runtime)
+                runtime = intent.getIntExtra("runtime", runtime) + 1
                 secondsRemaining = runtime
                 val notification = createNotification()
                 startForeground(NOTIF_ID, notification)
@@ -75,43 +79,15 @@ class TimerService : Service() {
         notificationManager.createNotificationChannel(channel)
     }
 
-    private fun createJingleChannel() {
-        val channel = NotificationChannel(
-            JINGLE_CHANNEL_ID,
-            "Jingle",
-            NotificationManager.IMPORTANCE_HIGH
-        )
-        notificationManager.createNotificationChannel(channel)
-    }
-
-
-
-
-    private fun sendJingleNotification() {
-        val notification = NotificationCompat.Builder(this, JINGLE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.timer_icon)
-            .setAutoCancel(true)
-            .build()
-
-        notificationManager.notify(JINGLE_ID, notification)
-
-        val notificationUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-        val ringtone = RingtoneManager.getRingtone(this, notificationUri)
-        ringtone.play()
-
-        Handler(Looper.getMainLooper()).postDelayed({
-            notificationManager.cancel(JINGLE_ID)
-            ringtone.stop()
-        }, 1000)
-    }
-
-
     private fun createNotification(): Notification {
         remoteViews = RemoteViews(packageName, R.layout.notification_timer)
-        remoteViews?.setTextViewText(R.id.tv_timer, secondsRemaining.toString())
-
-        val progress = (secondsRemaining * 100) / runtime
-        remoteViews?.setProgressBar(R.id.progress_bar, 100, progress, false)
+        remoteViews?.setChronometer(
+            R.id.chronometer,
+            SystemClock.elapsedRealtime() + (secondsRemaining * 1000),
+            null,
+            true
+        )
+        remoteViews?.setTextColor(R.id.chronometer, Color.WHITE)
 
         val startIntent = Intent(this, TimerService::class.java).apply {
             action = ACTION_START_TIMER
@@ -144,31 +120,63 @@ class TimerService : Service() {
         if (timerJob == null) {
             timerJob = CoroutineScope(Dispatchers.Main).launch {
                 while (isActive && secondsRemaining >= 0) {
-                    updateNotification()
                     delay(1000)
                     secondsRemaining--
                 }
-                if (secondsRemaining < 0) {
+                if (secondsRemaining <= 0) {
                     stopTimer()
-                    sendJingleNotification()
+                    playJingle()
                 }
             }
         }
     }
 
-    private fun updateNotification() {
-        val progress = (secondsRemaining * 100) / runtime
-        remoteViews?.setProgressBar(R.id.progress_bar, 100, progress, false)
 
-        remoteViews?.setTextViewText(R.id.tv_timer, secondsRemaining.toString())
-        notificationManager.notify(NOTIF_ID, notificationBuilder!!.build())
+    private fun initializeRingtone() {
+        val notification = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        ringtone = RingtoneManager.getRingtone(applicationContext, notification)
+        ringtone.audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+    }
+
+    private fun playJingle() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            ringtone.isLooping = false
+        }
+
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val originalVolume = audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION)
+        audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION), 0)
+
+        ringtone.play()
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            ringtone.stop()
+            audioManager.setStreamVolume(AudioManager.STREAM_NOTIFICATION, originalVolume, 0)
+        }, 3000)
     }
 
     private fun stopTimer() {
         timerJob?.cancel()
         timerJob = null
         secondsRemaining = runtime
-        updateNotification()
+        remoteViews?.setChronometer(
+            R.id.chronometer,
+            SystemClock.elapsedRealtime() + runtime * 1000,
+            null,
+            false
+        )
+        notificationBuilder = NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
+            .setSmallIcon(R.drawable.timer_icon)
+            .setCustomContentView(remoteViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setOngoing(true)
+        val notification = notificationBuilder!!.build()
+        notificationManager.notify(NOTIF_ID, notification)
     }
 
     override fun onDestroy() {
