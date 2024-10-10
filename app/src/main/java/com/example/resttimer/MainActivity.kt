@@ -30,11 +30,11 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
             if (!isGranted) {
-                permissionsDenied = true;
+                permissionsDenied = true
             }
         }
 
-    private var permissionsDenied = false;
+    private var permissionsDenied = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
