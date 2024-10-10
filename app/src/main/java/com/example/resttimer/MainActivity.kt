@@ -7,14 +7,19 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import android.Manifest
+import android.content.res.Configuration
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -45,25 +50,34 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     TimerView(
                         modifier = Modifier.padding(innerPadding),
-                        btnClick = ::buttonClick )
+                        start = this::startService,
+                        stop = ::stopService)
                 }
             }
         }
     }
 
-    private fun buttonClick(seconds:String){
+    private fun startService(seconds:String){
         if(permissionsDenied){
             checkPermissions()
         }
         startTimerService(seconds)
     }
 
-
-    private fun startTimerService(seconds: String) {
-        val serviceIntent = Intent(this, TimerService::class.java)
+    private fun stopService(){
+        val serviceIntent = Intent(this, TimerService::class.java).apply {
+            action = TimerService.ACTION_KILL
+        }
         startForegroundService(serviceIntent)
     }
 
+    private fun startTimerService(seconds: String) {
+        val serviceIntent = Intent(this, TimerService::class.java).apply {
+            putExtra("runtime", seconds.toInt())
+            action = TimerService.ACTION_START_TIMER
+        }
+        startForegroundService(serviceIntent)
+    }
     private fun checkPermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val notificationPermissionGranted =
@@ -87,35 +101,49 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun TimerView(modifier: Modifier = Modifier, btnClick: (String) -> Unit) {
-    var textFieldValue by remember { mutableStateOf("90") }
+fun TimerView(modifier: Modifier = Modifier, start: (String) -> Unit, stop: () -> Unit) {
+    var textFieldValue by remember { mutableStateOf("5") }
 
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.fillMaxHeight(0.4f))
-        CenteredTextField(
+        Spacer(modifier = Modifier.fillMaxHeight(0.3f))
+        CenteredTextField2(
             value = textFieldValue,
             onValueChange = { newValue ->
                 textFieldValue = newValue
             },
             modifier = Modifier
-                .fillMaxWidth(0.5f)
+                .fillMaxWidth(0.7f)
                 .padding(horizontal = 16.dp),
         )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
+        Spacer(modifier = Modifier.height(14.dp))
+        ElevatedButton(
             onClick = {
-                btnClick(textFieldValue)
+                start(textFieldValue)
             },
             modifier = Modifier
                 .fillMaxWidth(0.6f)
                 .height(100.dp)
         ) {
             Text(
-                text = "Start",
+                text = "START",
+                fontSize = 24.sp
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        ElevatedButton(
+            onClick = {
+                stop()
+            },
+            modifier = Modifier
+                .fillMaxWidth(0.6f)
+                .height(100.dp)
+        ) {
+            Text(
+                text = "STOP",
                 fontSize = 24.sp
             )
         }
@@ -146,11 +174,55 @@ fun CenteredTextField(
     )
 }
 
-@Preview(showBackground = true)
+@Composable
+fun CenteredTextField2(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 100.sp,
+    textColor: Color = if (isSystemInDarkTheme()) Color.White else Color.Black,
+    cursorColor: Color = Color.Blue,
+    placeholder: String = ""
+) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        textStyle = TextStyle(
+            color = textColor,
+            textAlign = TextAlign.Center,
+            fontSize = fontSize
+        ),
+        modifier = modifier
+            .padding(16.dp),
+        cursorBrush = SolidColor(cursorColor),
+        decorationBox = { innerTextField ->
+            if (value.isEmpty()) {
+                Text(
+                    text = placeholder,
+                    color = Color.Gray,
+                    fontSize = fontSize,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            innerTextField()
+        },
+        keyboardOptions = KeyboardOptions.Default.copy(
+            capitalization = KeyboardCapitalization.None,
+            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+        )
+    )
+}
+
+
+
+@Preview( showBackground = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES, // Enable dark mode
+    name = "Dark Mode Preview")
 @Composable
 fun GreetingPreview() {
     RestTimerTheme {
-        TimerView(modifier = Modifier){}
+        TimerView(modifier = Modifier, start = {}, stop = {})
     }
 }
 

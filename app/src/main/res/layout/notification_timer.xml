@@ -1,39 +1,48 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
+    android:orientation="vertical"
     android:padding="8dp">
 
-    <TextView
-        android:id="@+id/tv_timer"
-        android:layout_width="0dp"
-        android:layout_height="50dp"
-        android:layout_weight="1"
-        android:textColor="@android:color/white"
-        android:textSize="40sp" />
+    <!-- Row with Timer TextView and Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-    <FrameLayout
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent">
+        <!-- Timer TextView -->
+        <TextView
+            android:id="@+id/tv_timer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@android:color/white"
+            android:textSize="40sp"
+            android:layout_marginEnd="16dp"/>
 
+        <!-- Start Button -->
         <Button
             android:id="@+id/btn_start"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:text="@string/start" />
-    </FrameLayout>
+            android:text="@string/start"
+            android:layout_marginEnd="8dp"/>
 
-    <FrameLayout
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent">
-
+        <!-- Stop Button -->
         <Button
             android:id="@+id/btn_stop"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="top"
-            android:text="@string/stop" />
-    </FrameLayout>
+            android:text="@string/stop"/>
+    </LinearLayout>
+
+    <!-- Progress Bar -->
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:max="100"
+        android:progress="100"
+        android:layout_marginTop="16dp"/>
 </LinearLayout>
